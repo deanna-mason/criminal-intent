@@ -41,3 +41,6 @@ example
 # generated native folders
 /ios
 /android
+
+# internal planning docs (not part of the submission)
+docs/
