@@ -1,21 +1,15 @@
-import * as Crypto from 'expo-crypto';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
-import { useEffect, useState } from 'react';
-import {
-    ScrollView,
-    StyleSheet,
-    Text,
-    View,
-} from 'react-native';
-import DateTimePickerModal from 'react-native-modal-datetime-picker';
+import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import Checkbox from '../../components/Checkbox';
 import HeaderIconButton from '../../components/HeaderIconButton';
 import PhotoField from '../../components/PhotoField';
 import SaveToast from '../../components/SaveToast';
 import ThemedButton from '../../components/ThemedButton';
 import ThemedTextInput from '../../components/ThemedTextInput';
-import { getCrime, saveCrime, type Crime } from '../../storage/crimes';
+import { useCrimeDraft } from '../../hooks/useCrimeDraft';
+import { useDatePicker } from '../../hooks/useDatePicker';
 import { useTheme } from '../../theme/ThemeContext';
+
 
 function formatDate(iso: string): string {
     return new Date(iso)
@@ -32,40 +26,12 @@ export default function CrimeDetail() {
     const { theme } = useTheme();
     const router = useRouter();
     const params = useLocalSearchParams<{ id: string }>();
-    const isNew = params.id === 'new';
 
-    const [draft, setDraft] = useState<Crime>({
-        id: '',
-        title: '',
-        details: '',
-        date: new Date().toISOString(),
-        solved: false,
+    const { draft, update, save, toastVisible, hideToast } = useCrimeDraft(params.id);
+    const datePicker = useDatePicker({
+        value: new Date(draft.date),
+        onChange: (date) => update({ date: date.toISOString() }),
     });
-    const [datePickerOpen, setDatePickerOpen] = useState(false);
-    const [toastVisible, setToastVisible] = useState(false);
-
-    useEffect(() => {
-        if (isNew) return;
-        getCrime(params.id).then((found) => {
-            if (found) setDraft(found);
-            else router.back();
-        });
-    }, [params.id, isNew, router]);
-
-
-    async function handleSave() {
-        let toSave = draft;
-        if (!toSave.id) {
-            const newId = Crypto.randomUUID();
-            toSave = { ...toSave, id: newId };
-            setDraft(toSave);
-        }
-        await saveCrime(toSave);
-        if (params.id === 'new') {
-            router.setParams({ id: toSave.id });
-        }
-        setToastVisible(true);
-    }
 
 
     return (
@@ -87,7 +53,7 @@ export default function CrimeDetail() {
                     <View style={styles.topRow}>
                         <PhotoField
                             uri={draft.photoUri}
-                            onChange={(uri) => setDraft({ ...draft, photoUri: uri })}
+                            onChange={(uri) => update({ photoUri: uri })}
                         />
                         <View style={styles.titleColumn}>
                             <Text style={[styles.label, { color: theme.colors.text, fontFamily: 'Fraunces_700Bold' }]}>
@@ -95,7 +61,7 @@ export default function CrimeDetail() {
                             </Text>
                             <ThemedTextInput
                                 value={draft.title}
-                                onChangeText={(t) => setDraft({ ...draft, title: t })}
+                                onChangeText={(t) => update({ title: t })}
                                 placeholder="Title"
                             />
                         </View>
@@ -108,7 +74,7 @@ export default function CrimeDetail() {
                         <ThemedTextInput
                             variant="box"
                             value={draft.details}
-                            onChangeText={(t) => setDraft({ ...draft, details: t })}
+                            onChangeText={(t) => update({ details: t })}
                             placeholder="What happened?"
                             multiline
                         />
@@ -116,30 +82,21 @@ export default function CrimeDetail() {
 
                     <ThemedButton
                         label={formatDate(draft.date)}
-                        onPress={() => setDatePickerOpen(true)}
+                        onPress={datePicker.open}
                     />
 
                     <Checkbox
                         checked={draft.solved}
-                        onChange={(v) => setDraft({ ...draft, solved: v })}
+                        onChange={(v) => update({ solved: v })}
                         label="Solved"
                     />
 
-                    <ThemedButton label="Save" onPress={handleSave} />
+                    <ThemedButton label="Save" onPress={save} />
                 </ScrollView>
 
-                <DateTimePickerModal
-                    isVisible={datePickerOpen}
-                    mode="date"
-                    date={new Date(draft.date)}
-                    onConfirm={(d) => {
-                        setDatePickerOpen(false);
-                        setDraft({ ...draft, date: d.toISOString() });
-                    }}
-                    onCancel={() => setDatePickerOpen(false)}
-                />
+                {datePicker.picker}
 
-                <SaveToast visible={toastVisible} onHide={() => setToastVisible(false)} />
+                <SaveToast visible={toastVisible} onHide={hideToast} />
             </View>
         </>
     );
